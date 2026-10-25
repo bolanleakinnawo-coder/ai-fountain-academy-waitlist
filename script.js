@@ -37,7 +37,7 @@
     if (!grid) return;
     grid.innerHTML = COURSES.map(function (c, i) {
       var n = String(i + 1).padStart(2, "0");
-      return '<article class="course" data-reveal style="--d:' + (i % 3) * 0.08 + 's">' +
+      return '<article class="course" id="course-' + c.slug + '" data-reveal style="--d:' + (i % 3) * 0.08 + 's">' +
         '<div class="course-thumb">' +
           '<img src="assets/img/thumbs/' + c.slug + '.png" alt="' + esc(c.title) + ' course thumbnail" loading="lazy" width="1280" height="720">' +
           (c.hot ? '<span class="course-badge hot"><span class="live-dot red"></span>Hot course</span>' : "") +
@@ -227,6 +227,159 @@
     document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !box.hidden) shut(); });
   }
 
+
+  /* ---------- Hero deck: swipe, drag, arrows, auto-play ---------- */
+  function heroDeck() {
+    var stage = $("#deck-stage");
+    if (!stage) return;
+    var titleEl = $("#deck-title"), numEl = $("#deck-num"), dotsEl = $("#deck-dots");
+    var cards = COURSES.map(function (c, i) {
+      var el = document.createElement("div");
+      el.className = "deck-card";
+      el.innerHTML = '<img src="assets/img/thumbs/' + c.slug + '.png" alt="" draggable="false">';
+      el.setAttribute("aria-hidden", "true");
+      stage.insertBefore(el, stage.firstChild);
+      return el;
+    });
+    dotsEl.innerHTML = COURSES.map(function (c, i) {
+      return '<button aria-label="Show course ' + (i + 1) + ": " + esc(c.title) + '"></button>';
+    }).join("");
+    var dots = $$("button", dotsEl);
+    var index = 0, busy = false, timer = 0, touched = false;
+
+    // Places each card in the stack. `skip` is a card mid-animation that keeps its own spot.
+    function layout(skip, quiet) {
+      cards.forEach(function (el, i) {
+        if (el === skip) return;
+        var pos = (i - index + cards.length) % cards.length;
+        el.setAttribute("data-pos", pos < 3 ? pos : "hidden");
+      });
+      if (quiet) return;
+      dots.forEach(function (d, i) { d.classList.toggle("on", i === index); });
+      numEl.textContent = String(index + 1).padStart(2, "0");
+      titleEl.classList.add("swap");
+      setTimeout(function () { titleEl.textContent = COURSES[index].title; titleEl.classList.remove("swap"); }, 180);
+    }
+
+    // Front card flies off to one side, then tucks in at the back.
+    function next(dir) {
+      if (busy) return;
+      busy = true;
+      var front = cards[index];
+      front.classList.remove("dragging", "nudge");
+      front.style.transform = "translate(" + (dir < 0 ? -130 : 130) + "%, 8%) rotate(" + (dir < 0 ? -14 : 14) + "deg)";
+      front.style.opacity = "0";
+      index = (index + 1) % cards.length;
+      layout(front);
+      setTimeout(function () {
+        front.classList.add("instant");
+        front.style.transform = ""; front.style.opacity = "";
+        front.setAttribute("data-pos", "hidden");
+        void front.offsetWidth;
+        front.classList.remove("instant");
+        layout(null, true);
+        busy = false;
+      }, 420);
+    }
+    // The previous card slides in from the left onto the front.
+    function prev() {
+      if (busy) return;
+      busy = true;
+      index = (index - 1 + cards.length) % cards.length;
+      var incoming = cards[index];
+      incoming.classList.add("instant");
+      incoming.setAttribute("data-pos", "0");
+      incoming.style.transform = "translate(-130%, 8%) rotate(-14deg)";
+      incoming.style.opacity = "0";
+      void incoming.offsetWidth;
+      incoming.classList.remove("instant");
+      incoming.style.transform = ""; incoming.style.opacity = "";
+      layout();
+      setTimeout(function () { busy = false; }, 420);
+    }
+
+    function goTo(target) {
+      if (target === index || busy) return;
+      index = target;
+      layout();
+    }
+
+    function stopAuto() { clearInterval(timer); timer = 0; }
+    function startAuto() {
+      if (reduceMotion || touched) return;
+      stopAuto();
+      timer = setInterval(function () { next(-1); }, 3800);
+    }
+    function userAction() { touched = true; stopAuto(); var h = $(".deck-hint"); if (h) h.style.opacity = "0"; }
+
+    $("#deck-next").addEventListener("click", function () { userAction(); next(-1); });
+    $("#deck-prev").addEventListener("click", function () { userAction(); prev(); });
+    dots.forEach(function (d, i) { d.addEventListener("click", function () { userAction(); goTo(i); }); });
+    $("#deck").addEventListener("keydown", function (e) {
+      if (e.key === "ArrowRight") { userAction(); next(-1); }
+      if (e.key === "ArrowLeft") { userAction(); prev(); }
+    });
+
+    // Drag or swipe the front card.
+    var startX = 0, startY = 0, dx = 0, dragging = false, decided = false, pid = null;
+    stage.addEventListener("pointerdown", function (e) {
+      var front = cards[index];
+      if (busy || !front.contains(e.target) || (e.pointerType === "mouse" && e.button !== 0)) return;
+      dragging = true; decided = false; dx = 0; pid = e.pointerId;
+      startX = e.clientX; startY = e.clientY;
+    });
+    stage.addEventListener("pointermove", function (e) {
+      if (!dragging || e.pointerId !== pid) return;
+      var mx = e.clientX - startX, my = e.clientY - startY;
+      if (!decided) {
+        if (Math.abs(mx) < 6 && Math.abs(my) < 6) return;
+        decided = true;
+        if (Math.abs(my) > Math.abs(mx)) { dragging = false; return; } // let the page scroll
+        userAction();
+        try { stage.setPointerCapture(pid); } catch (err) {}
+        cards[index].classList.add("dragging");
+        cards[index].classList.remove("nudge");
+      }
+      dx = mx;
+      cards[index].style.transform = "translate(" + dx + "px," + Math.abs(dx) * 0.04 + "px) rotate(" + dx / 22 + "deg)";
+    });
+    function endDrag() {
+      if (!dragging) return;
+      dragging = false;
+      var front = cards[index];
+      front.classList.remove("dragging");
+      if (!decided) {
+        // A tap on the front card jumps to that course below.
+        var target = document.getElementById("course-" + COURSES[index].slug);
+        if (target) target.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+        return;
+      }
+      var far = Math.abs(dx) > Math.min(80, stage.offsetWidth * 0.18);
+      if (far && dx < 0) next(-1);           // swipe left: next course
+      else { front.style.transform = ""; if (far) prev(); } // swipe right: previous course
+    }
+    stage.addEventListener("pointerup", endDrag);
+    stage.addEventListener("pointercancel", function () { dragging = false; cards[index].classList.remove("dragging"); cards[index].style.transform = ""; });
+
+    // Pause auto-play while hovered or off screen.
+    stage.addEventListener("mouseenter", stopAuto);
+    stage.addEventListener("mouseleave", startAuto);
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(function (es) { if (es[0].isIntersecting) startAuto(); else stopAuto(); }).observe(stage);
+    }
+
+    layout();
+    titleEl.textContent = COURSES[0].title;
+
+    // One small nudge so people see the card moves.
+    deckHint = function () {
+      if (reduceMotion || touched) return;
+      setTimeout(function () { if (!touched && !busy) cards[index].classList.add("nudge"); }, 900);
+      cards.forEach(function (c) { c.addEventListener("animationend", function () { c.classList.remove("nudge"); }); });
+    };
+  }
+  var deckHint = function () {};
+
   /* ---------- Start ---------- */
   renderCourses();
   wireJoinLinks();
@@ -235,6 +388,7 @@
   scrollUi();
   parallax();
   videoPreview();
+  heroDeck();
 
   var started = false;
   function start() {
@@ -244,6 +398,7 @@
     if (loader) loader.classList.add("done");
     $$("[data-rotate]").forEach(rotateWords);
     observeReveals();
+    deckHint();
   }
   // Short intro, then reveal the page. Never hold it for more than ~1.6s.
   if (reduceMotion) start();

@@ -71,19 +71,25 @@
           </ul>
         </div>
 
-        <!-- Fanned course thumbnails -->
-        <div class="hero-stack" aria-hidden="true" data-reveal="scale" style="--d:.2s">
-          <div class="stack-card c3" data-tilt="0.5"><img src="assets/img/thumbs/ai-faceless-youtube-business.png" alt=""></div>
-          <div class="stack-card c2" data-tilt="0.8"><img src="assets/img/thumbs/ai-digital-product-blueprint.png" alt=""></div>
-          <div class="stack-card c1" data-tilt="1.2"><img src="assets/img/thumbs/swap-faces-live-calls.png" alt=""></div>
-          <div class="chip chip-a" data-tilt="1.8">
-            <span class="chip-icon"><svg viewBox="0 0 24 24"><use href="#i-play"/></svg></span>
-            <span><strong>Video-first lessons</strong><small>Follow along, click by click</small></span>
+        <!-- Swipeable deck of all six courses (cards are added by script.js) -->
+        <div class="deck" id="deck" data-reveal="scale" style="--d:.2s" role="region" aria-roledescription="carousel" aria-label="The six courses">
+          <div class="deck-stage" id="deck-stage">
+            <div class="chip chip-b" data-tilt="1.4" aria-hidden="true">
+              <span class="chip-icon green"><svg viewBox="0 0 24 24"><use href="#i-wa"/></svg></span>
+              <span><strong>Waitlist on WhatsApp</strong><small>One tap to join</small></span>
+            </div>
           </div>
-          <div class="chip chip-b" data-tilt="1.4">
-            <span class="chip-icon green"><svg viewBox="0 0 24 24"><use href="#i-wa"/></svg></span>
-            <span><strong>Waitlist on WhatsApp</strong><small>One tap to join</small></span>
+          <div class="deck-bar">
+            <div class="deck-info" aria-live="polite">
+              <span class="deck-count mono"><span id="deck-num">01</span> / 06<span class="deck-hint"> · Swipe to see all six</span></span>
+              <strong class="deck-title" id="deck-title"></strong>
+            </div>
+            <div class="deck-nav">
+              <button class="deck-btn" id="deck-prev" aria-label="Previous course"><svg viewBox="0 0 16 16" width="16" height="16" fill="none"><path d="M13 8H3m4-4L3 8l4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              <button class="deck-btn" id="deck-next" aria-label="Next course"><svg viewBox="0 0 16 16" width="16" height="16" fill="none"><path d="M3 8h10m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
           </div>
+          <div class="deck-dots" id="deck-dots"></div>
         </div>
       </div>
 
